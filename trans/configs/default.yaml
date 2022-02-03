@@ -1,0 +1,83 @@
+# CONFIG
+
+TASK: "TCGA-RCC_effb0_T2T"
+DATA_TABLE: "/apdcephfs/private_zhenyulin/wsi/DataSet/KICH-KIRC-KIRP/KICH_KIRC_KIRP.csv"
+NUM_FOLD: 5
+LABEL_NAME: "Positive"
+
+
+PATCH:
+    IDX2IMG: "/apdcephfs/private_zhenyulin/wsi/DataSet/KICH-KIRC-KIRP/log/dict_name2imgs.pkl"
+
+PRETRAIN:
+    MODEL_NAME: 'efficientnet-b0'
+    MODEL_PATH: '/apdcephfs/private_zhenyulin/wsi/zhenyulin/backup/ck/efficientnet-b0-355c32eb.pth'
+    SAVE_DIR: '/apdcephfs/private_zhenyulin/wsi/DataSet/KICH-KIRC-KIRP/log/pretrained_features/'
+    SAVE_DIR_COMBINED: '/apdcephfs/private_zhenyulin/wsi/DataSet/KICH-KIRC-KIRP/log/pretrained_features_combined/'
+    TRAIN_FEA_TIMES: 1
+#model: MODEL_NAME, NUM_INPUT_CHANNELS, NUM_CLASSES
+
+
+MODEL:
+    MODEL_NAME: 't2t_irpe'
+    NUM_CLASSES: 3
+
+
+MODEL_T2T:
+    ASPP_FLAG: 1
+    ATTN_DROP_RATE: 0.2
+    CHANNEL_REDUCE_RATE: 7
+    DEPTH: 6
+    DROP_RATE: 0.2
+    EMBED_DIM: 64
+    IRPE: 1
+    IRPE_METHOD: "euc"
+    IRPE_MODE: "bias"
+    IRPE_RPE_ON: "q"
+    IRPE_SHARE_HEAD: False
+    NUM_CLASSES: 3
+    NUM_HEADS: 16
+    NUM_INPUT_CHANNELS: 1280
+    TOKEN_DIM: 128
+    TOKEN_T_ATTN_DROP_RATE: 0.2
+    TOKEN_T_DROP_RATE: 0.2
+    TOKEN_T_IRPE: 0
+    TOKEN_T_IRPE_METHOD: "euc"
+    TOKEN_T_IRPE_MODE: "bias"
+    TOKEN_T_IRPE_RPE_ON: "q"
+    TOKEN_T_IRPE_SHARE_HEAD: False
+
+DATASET:
+    DATASET_NAME: 'cnn'
+    DATASET_SEED: 2
+    DATASET_SCALE: 'x20'
+    FEATURE_MAP_SIZE: 48
+
+
+# train: EPOCHS, BATCH_SIZE, LR
+TRAIN:
+    LOSS_NAME: 'be'
+    EPOCHS: 100 # 200
+    START_EPOCH: 0
+    BATCH_SIZE: 4 # 16
+    NUM_WORKERS: 10
+    LR: 2e-4
+    LR_DROP: 100
+    LR_BACKBONE: 2e-5
+    LR_LINEAR_PROJ_MULT: 0.1
+    WEIGHT_DECAY: 5e-2
+    CLIP_MAX_NORM: 0.01
+    OPTIM_NAME: 'adamw'
+    EVAL: False
+    RESUME_PATH: ''
+    OUTPUT_DIR: '/aaa/louisyuzhao/guy1/kaikasun/DataSet/cvpr_2022/KICH-KIRC-KIRP/output_newlabel/'
+    SEED: 666
+    CACHE_MODE: False
+    CLS_LOSS_COEF: 2 # for transformer below
+    BOX_LOSS_COEF: 5
+    GIOU_LOSS_COEF: 2
+    MASK_LOSS_COEF: 1
+    DICE_LOSS_COEF: 1
+    FOCAL_ALPHA: 0.25
+
+    
