@@ -1,3 +1,7 @@
+SETMIL: Spatial Encoding Transformer-based Multiple Instance Learning for Pathological Image Analysis
+
+Code for paper titled "SETMIL: Spatial Encoding Transformer-based Multiple Instance Learning for Pathological Image Analysis"
+
 Before you use this code, you need to configure default.yaml. Here we provide a reference. 
 
 1、First, in order to split the WSI into patches, execute the following script .
