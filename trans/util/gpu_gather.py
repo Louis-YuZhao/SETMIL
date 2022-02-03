@@ -10,7 +10,9 @@ from collections import defaultdict
 import numpy as np
 from itertools import chain
 
-"""https://github.com/facebookresearch/maskrcnn-benchmark/blob/master/maskrcnn_benchmark/utils/comm.py"""
+"""
+https://github.com/facebookresearch/maskrcnn-benchmark/blob/master/maskrcnn_benchmark/utils/comm.py
+"""
 
 
 def all_gather(data):
@@ -66,22 +68,10 @@ def all_gather(data):
         data_list.append(pickle.loads(buffer))
 
     return data_list
-    # for d in data_list:
-    #     print(d.shape)
-    # ret = []
-    # for d in data_list:
-    #     ret.append(d.clone().to(device))
-    # return ret
-
 
 """
 https://github.com/pytorch/ignite/blob/master/ignite/metrics/epoch_metric.py#L137
-代码出处
-
-
 """
-
-
 class NotComputableError(RuntimeError):
     """
     Exception class to raise if Metric cannot be computed.
@@ -153,12 +143,6 @@ class GpuGather:
 
         dist.barrier()
         if ws > 1 and not self._is_reduced:
-            # All gather across all processes
-            # _prediction_tensor = idist.all_gather(_prediction_tensor)
-            # _target_tensor = idist.all_gather(_target_tensor)
-            # dist.all_gather(_prediction_output, _prediction_tensor)
-            # dist.all_gather(_target_output, _target_tensor)
-
             for k, v in self.meters.items():
                 self.meters[k] = list(chain(*all_gather(v)))
 

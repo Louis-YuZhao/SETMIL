@@ -44,7 +44,6 @@ def parse_patch_fname_2(fp: str) -> Tuple[int, int]:
 def parse_patch_fname(fp: str) -> Tuple[int, int]:
     # d15-08498-tile-r16896-c20480-512x512
     tmp = fp
-    #fp = osp.basename(fp).rsplit('.', 1)[0]
     try:
         (r_loc, c_loc) = parse_patch_fname_1(fp)
     except:

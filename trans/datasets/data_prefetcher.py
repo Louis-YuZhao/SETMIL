@@ -48,14 +48,6 @@ class data_prefetcher():
             targets = self.next_targets
             if samples is not None:
                 samples.record_stream(torch.cuda.current_stream())
-
-            # modified by sunkai
-            #if targets is not None:
-                # print(targets)
-
-                # for t in targets:
-                #     for k, v in t.items():
-                #         v.record_stream(torch.cuda.current_stream())
             self.preload()
         else:
             try:

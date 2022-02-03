@@ -1,10 +1,5 @@
 
 import os, logging
-
-# import config as C
-# os.makedirs(C.CK_PATH, exist_ok=True)
-# log_path = f"{C.CK_PATH}/log_test.txt"
-
 def getLog(log_path, screen=False):
     if screen:
         logger = logging.getLogger()

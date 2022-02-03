@@ -24,10 +24,14 @@ import torch.multiprocessing as mp
 import threading
 from multiprocessing.pool import ThreadPool, Pool
 from concurrent.futures import ThreadPoolExecutor
-
+from efficientnet_pytorch import EfficientNet
+from configs import get_cfg_defaults, update_default_cfg
 
 import torch
 from torch import nn
+import torch.nn.functional as F
+import torchvision.models as models
+
 import torch.utils.data as data_utils
 import pretrainedmodels
 import torchvision
@@ -36,10 +40,8 @@ import torchvision.transforms as transforms
 import albumentations as alb
 from albumentations.pytorch import ToTensorV2
 
-
-
 """
-extract_feature.py 会对每个Patch TTA后提取多次特征
+extract path features
 - WSI id1
     - patch1 feat.pkl --> dict({'val': [1280] , 'tr': })
     - patch2 feat.pkl
@@ -190,43 +192,14 @@ def pred_and_save_with_dataloader(model, img_fp_list, local_rank, save_dir, batc
             val_feat = model(batch_tr_img)
             val_feat = val_feat.cpu().numpy()
             executor.submit(save_val_feat_in_thread, batch_pid, batch_img_bname, val_feat, save_dir)
-            # save_val_feat_in_thread(batch_pid, batch_img_bname, val_feat, save_dir)
-    # dl = torch.utils.data.DataLoader(
-    #     PatchDataset(img_fp_list, trans=tr_trans) if dataset_class=="imagenet" else PatchDatasetCLR(img_fp_list) ,
-    #     batch_size=batch_size,
-    #     num_workers=num_processes,
-    #     shuffle=False,
-    #     drop_last=False
-    # )
-    # for t in range(times):
-    #     print(f"running times: {t+1}/{times}")
-    #     random.seed(t)
-    #     for batch in progress.track(dl):
-    #         batch_pid, batch_img_bname, batch_tr_img = batch
-    #         batch_tr_img = batch_tr_img.cuda()
-    #
-    #         with torch.no_grad():
-    #             tr_feat = model(batch_tr_img)
-    #             tr_feat = tr_feat.cpu().numpy()
-    #             executor.submit(save_feat_in_thread, batch_pid, batch_img_bname, tr_feat, save_dir)
-
     print("task finished..")
 #########################################################################
-from efficientnet_pytorch import EfficientNet
-
-# pre-download from https://github.com/lukemelas/EfficientNet-PyTorch/releases/tag/1.0
-efn_pretrained = {
-    #'efficientnet-b0': '/apdcephfs/private_zhenyulin/wsi/zhenyulin/backup/ck/efficientnet-b0-355c32eb.pth',
-    'efficientnet-b0': '/aaa/louisyuzhao/guy1/zhenyulin/backup/ck/efficientnet-b0-355c32eb.pth'
-}
-
 class EffNet(nn.Module):
-    def __init__(self, efname='efficientnet-b0'):
+    def __init__(self, efname='efficientnet-b0', model_path=""):
         super(EffNet, self).__init__()
         self.model = EfficientNet.from_name(efname)
-        pretrain_model_fp = efn_pretrained[efname]
-        print(f'Load pretrain model from {pretrain_model_fp}')
-        self.model.load_state_dict(torch.load(pretrain_model_fp))
+        print(f'Load pretrain model from {model_path}')
+        self.model.load_state_dict(torch.load(model_path))
 
     def forward(self, data):
         bs = data.shape[0]
@@ -253,11 +226,6 @@ class PretrainedNet(nn.Module):
         return feat # 2048
 
 #########################################################################
-
-import torch.nn as nn
-import torch.nn.functional as F
-import torchvision.models as models
-
 
 class ResNetSimCLR(nn.Module):
 
@@ -286,12 +254,7 @@ class ResNetSimCLR(nn.Module):
     def forward(self, x):
         h = self.features(x)
         h = h.squeeze()
-        #
-        # x = self.l1(h)
-        # x = F.relu(x)
-        # x = self.l2(x)
         return h
-
 class FeatureResNetSimCLR(nn.Module):
     def __init__(self, model_path="", base_model='se_resnet50', out_dim=256):
         super(FeatureResNetSimCLR, self).__init__()
@@ -307,11 +270,8 @@ class FeatureResNetSimCLR(nn.Module):
     def forward(self, data):
         bs = data.shape[0]
         feat = self.model.features(data)
-        # feat = nn.functional.adaptive_avg_pool2d(feat, output_size=(1))
         feat = feat.view(bs, -1)
         return feat # 512
-
-
 class FeatureResNetMoCo(nn.Module):
     def __init__(self, model_path="", base_model='se_resnet50'):
         super(FeatureResNetMoCo, self).__init__()
@@ -350,7 +310,7 @@ class FeatureResNetMoCo(nn.Module):
 
 def get_model(model_name="", model_path="", num_classes=2):
     if model_name == "efficientnet-b0":
-        model = EffNet()
+        model = EffNet(efname='efficientnet-b0', model_path=model_path)
     elif model_name== 'MoCo.resnet18':
         model = FeatureResNetMoCo(model_path=model_path, base_model="resnet18")
     elif model_name== "SimCLR.resnet18":
@@ -364,20 +324,10 @@ def get_model(model_name="", model_path="", num_classes=2):
 
 #########################################################################
 
-from configs import get_cfg_defaults, update_default_cfg
-import argparse
-
+#%%
 if __name__ == "__main__":
-    parser = argparse.ArgumentParser(
-        description="WSI patch features extraction"
-    )
-    parser.add_argument(
-        "--cfg",
-        default="/aaa/louisyuzhao/guy1/kaikasun/goWSI/trans/configs/configs_kaikasun/huyanyuan_outside_patch_dtmil_KRAS_firstexternal_outside_test.yaml",
-        metavar="FILE",
-        help="path to config file",
-        type=str,
-    )
+    parser = argparse.ArgumentParser(description="WSI patch features extraction")
+    parser.add_argument("--cfg", default= None, metavar="FILE", help="path to config file", type=str,)
     args = parser.parse_args()
     cfg = get_cfg_defaults()
     cfg.merge_from_file(args.cfg)
@@ -405,10 +355,6 @@ if __name__ == "__main__":
     print(f'Len of img {len(img_fp_list)}')
 
     img_fp_list = sorted(img_fp_list)
-
-    # print(img_fp_list)
-    # 开第二台机器
-    # img_fp_list = sorted(img_fp_list, reverse=True)
 
     # extract feature to *.pkl
     if model_name == 'MoCo.resnet18' or model_name == "SimCLR.resnet18":

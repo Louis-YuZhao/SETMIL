@@ -47,7 +47,6 @@ class WSIDataset(data_utils.Dataset):
             fp = v['patch']
             self.wsi_loc.append((pid, label, fp))
 
-        # 按照WSI ID排序
         sorted(self.wsi_loc, key=lambda x: x[0])
 
         self.num_class = num_class
@@ -113,14 +112,6 @@ class WSIDataset(data_utils.Dataset):
 
         for l_idx in range(len(patch_loc)):
             loc[l_idx] = torch.tensor(patch_loc[l_idx])
-
-        # print(loc[:5])
-        # debug
-        # rows = 5
-        # for r_idx in range(rows):
-        #     for c_idx in range(8):
-        #         layer_idx = r_idx * rows + c_idx
-        #         loc[layer_idx] = torch.tensor([r_idx, c_idx])
 
         pid_img_id = self.pid_2_img_id[image_id]
         target = {

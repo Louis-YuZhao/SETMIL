@@ -1,8 +1,8 @@
 SETMIL: Spatial Encoding Transformer-based Multiple Instance Learning for Pathological Image Analysis
 
-Code for paper titled "SETMIL: Spatial Encoding Transformer-based Multiple Instance Learning for Pathological Image Analysis"
+Code for paper titled "SETMIL: Spatial Encoding Transformer-based Multiple Instance Learning for Pathological Image Analysis".
 
-Before you use this code, you need to configure default.yaml. Here we provide a reference. 
+Before you use this code, we need to configure the default.yaml. Here we provide a reference. 
 
 1、First, in order to split the WSI into patches, execute the following script .
 
@@ -11,7 +11,7 @@ python WSI_cropping.py
   --output /output_patch/
   --scale 20 --patch_size 1120 --num_threads 16
 
-2、Then, extract features from each patch. It's worth noting that you need to pretrain a feature extractor before using it. 
+2、Then, extract features from each patch. a pre-trained feature extractor can be utilized here (e.g. EfficientNet-B0 trained on the ImageNet). 
 
 python extract_feature.py 
 - WSI id1
@@ -27,7 +27,7 @@ python extract_feature.py
 python merge_patch_feat.py --cfg configs/*.yaml
 
 
-4、Finally, you can train with preprocessed data 
+4、Finally, we can train the model with preprocessed data 
 
-python main.py --cfg configs/*.yaml
+python ./trans/main.py --cfg ./trans/configs/*.yaml
 

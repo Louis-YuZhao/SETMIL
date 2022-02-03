@@ -64,7 +64,7 @@ def main(cfg):
     # model, criterion, postprocessors = build_model(args)
     model_name = cfg.MODEL.MODEL_NAME
     logger.info(f'Build Model: {model_name}')
-    if model_name == 't2t_irpe':
+    if model_name == 'SETMIL':
         model, criterion = build_t2t_irpe(cfg)
         model.to(device)
     else:

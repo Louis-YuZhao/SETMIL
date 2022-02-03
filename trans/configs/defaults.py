@@ -1,10 +1,5 @@
-# from yacs.yacs_config import CfgNode as CN
 from yacs.config import CfgNode as CN
 import os.path as osp
-
-# https://github.com/rbgirshick/yacs
-
-# ⏳ will be update automatically
 
 _C = CN()
 _C.TASK = ''
@@ -228,8 +223,7 @@ def get_cfg_defaults():
 
 
 def update_default_cfg(cfg):
-    """有些路径是与BADE_DIR合成的, 如果没有提供,需要设为默认值
-
+    """
     Args:
         cfg ([type]): [description]
     """

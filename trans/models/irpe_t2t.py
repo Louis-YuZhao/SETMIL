@@ -273,12 +273,5 @@ def build(args):
 
     criterion = nn.CrossEntropyLoss()
     criterion.to(device)
-
-    # print usage
-    # dump_input = torch.randn((16, 1280, 48, 48)).cuda()
-    # with torch.autograd.profiler.profile(enabled=True, use_cuda=True, record_shapes=False, profile_memory=False) as prof:
-    #     outputs = model(dump_input)
-    # print(prof.table())
-
     return model, criterion
 

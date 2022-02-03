@@ -13,6 +13,8 @@ import time, sys, warnings, glob
 import threading
 import multiprocessing
 from tqdm import tqdm
+from xml.etree.ElementTree import parse
+import shapely.geometry as shgeo
 import argparse, pickle, random
 warnings.simplefilter('ignore')
 
@@ -25,7 +27,6 @@ def thres_saturation(img, t=15):
     :param t:
     :return: boolean
     """
-    # typical t = 15
     img = rgb2hsv(img)
     h, w, c = img.shape
     sat_img = img[:, :, 1]
@@ -36,8 +37,7 @@ def thres_saturation(img, t=15):
 
 def crop_slide(img, save_slide_path, mark, position=(0, 0), step=(0, 0), patch_size=224, scale=10, down_scale=1): # position given as (x, y) at nx scale
     patch_name = "{}_{}".format(step[0], step[1])
-    # 17-10746-tile-r12288-c31744-1024x1024.png
-    # HACK row and col fixed
+
     img_nx_path = join(save_slide_path, f"{patch_name}-tile-r{position[1] * down_scale}-c{position[0] * down_scale}-{patch_size}x{patch_size}_{mark}.png")
     if path.exists(img_nx_path):
         return 1
@@ -54,29 +54,16 @@ def crop_slide(img, save_slide_path, mark, position=(0, 0), step=(0, 0), patch_s
     except Exception as e:
         print(e)
                         
-def slide_to_patch(out_base, img_slides, patch_size, step_size, scale):
+def slide_to_patch(out_base, img_slides, patch_size, step_size, scale, down_scale=1):
     makedirs(out_base, exist_ok=True)
     for s in tqdm(range(len(img_slides))):
         img_slide = img_slides[s]
         img_name = img_slide.split(path.sep)[-1].split('.')[0]
         bag_path = join(out_base, img_name)
-        # if path.exists(bag_path) and len(listdir(bag_path))>0:
-        #     continue
+
         makedirs(bag_path, exist_ok=True)
         img = slide.OpenSlide(img_slide)
-
-        # if int(np.floor(float(img.properties['openslide.mpp-x'])*10)) == 2:
-        #     down_scale =
-        #     dimension = img.level_dimensions[0] # given as width, height
-        #     dimension_scale = (int(dimension[0] / 8), int(dimension[1] / 8))
-        # else:
-        #     dimension = img.level_dimensions[0]
-        #     dimension_scale = (int(dimension[0] / 4), int(dimension[1] / 4))
-        # if multiscale == 1:
-        #     step_y_max = int(np.floor(dimension_5x[1]/step_size)) # rows
-        #     step_x_max = int(np.floor(dimension_5x[0]/step_size)) # columns
-        # else:
-        down_scale=1
+        
         try:
             if int(np.floor(float(img.properties['openslide.mpp-x'])*10)) == 2:
                 down_scale = (40 // scale)
@@ -101,8 +88,6 @@ def slide_to_patch(out_base, img_slides, patch_size, step_size, scale):
                 count += 1
                 print(f"{count}/{num}", (end_time-start_time)/60)
 
-from xml.etree.ElementTree import parse
-import shapely.geometry as shgeo
 def extract_coord_from_xml(xml_path: str) -> list:
     """extract annotation coordinates from xml file
 
@@ -145,7 +130,7 @@ def extract_coord_from_xml(xml_path: str) -> list:
     return coord_group
 
 def convert_diag_to_cycle_coords(pst_lt: tuple, pst_rb: tuple):
-    """将对角坐标转为连续坐标值
+    """
     Args:
         pst_lt (tuple): [description]
         pst_rb (tuple): [description]
@@ -192,9 +177,6 @@ def slide_to_patch_in_annotation(out_base, img_slide, patch_size, step_size, sca
         print(".xml not found, crop all patches..", img_name)
     else:
         annot_group = extract_coord_from_xml(xml_path)
-
-    # if path.exists(bag_path) and len(listdir(bag_path))>0:
-    #     continue
     makedirs(bag_path, exist_ok=True)
     try:
         img = slide.OpenSlide(img_slide)
@@ -209,35 +191,18 @@ def slide_to_patch_in_annotation(out_base, img_slide, patch_size, step_size, sca
             down_scale = (20 // scale)
     except Exception as e:
         print(e)
-    # if down_scale!=1:
-    #     print("down_scale",down_scale)
-    #     return img_name, []
+
     dimension = img.level_dimensions[0]
     # dimension and step at given scale
     step_y_max = int(np.floor(dimension[1]/(step_size*down_scale))) # rows
     step_x_max = int(np.floor(dimension[0]/(step_size*down_scale))) # columns
-    #print("number :", step_x_max*step_y_max)
-    #print(bag_path)
     for j in range(step_y_max):
         for i in range(step_x_max):
 
             patch_name = "{}_{}".format(j, i)
-            # down_scale = 1
-            # try:
-            #     if int(np.floor(float(img.properties['openslide.mpp-x']) * 10)) == 2:  # 40x
-            #         down_scale = (40 // scale)
-            #     else:  # 20x
-            #         down_scale = (20 // scale)
-            # except Exception as e:
-            #     print("tiff --> No properties 'openslide.mpp-x'")
-            # img_nx_path = join(bag_path,
-            #                    f"{patch_name}-tile-r{j*step_size * down_scale}-c{i*step_size * down_scale}-{patch_size}x{patch_size}.png")
-
             o_r_s, o_c_s = j*step_size * down_scale, i*step_size * down_scale
             o_r_e, o_c_e = o_r_s + patch_size, o_c_s + patch_size
             if CROP_ALL or is_patch_in_annotation((o_r_s, o_c_s), (o_r_e, o_c_e), annot_group, thres=0.01):
-            #if not is_patch_in_annotation((o_r_s, o_c_s), (o_r_e, o_c_e), annot_group, thres=0.01):
-                #indicat whether in annotation
                 mark = 1
                 img_nx_path = join(bag_path,
                                    f"{patch_name}-tile-r{j * step_size * down_scale}-c{i * step_size * down_scale}-{patch_size}x{patch_size}.png")
@@ -246,21 +211,6 @@ def slide_to_patch_in_annotation(out_base, img_slide, patch_size, step_size, sca
                 if path.exists(img_nx_path):
                     print("in annotation", img_nx_path)
                 patch_in_annotation_list.append(img_nx_path)
-                # else:
-                #     print("in annotation but not exsits", img_nx_path)
-            # else:
-            #     print("not in annotation",o_r_s, o_c_s)
-            #added by sunkai
-            # elif not is_patch_in_annotation((o_r_s, o_c_s), (o_r_e, o_c_e), annot_group, thres=0.01):
-            #     mark = 0
-            #     img_nx_path = join(bag_path,
-            #                        f"{patch_name}-tile-r{j * step_size * down_scale}-c{i * step_size * down_scale}-{patch_size}x{patch_size}_0.png")
-            #     # enable to crop at the same time
-            #     # crop_slide(img, bag_path, mark, (i * step_size, j * step_size), step=(j, i), patch_size=patch_size,
-            #     #            scale=scale, down_scale=down_scale)
-            #     #if path.exists(img_nx_path):
-            #         # print("in annotation", img_nx_path)
-            #     patch_in_annotation_list.append(img_nx_path)
 
     return img_name, patch_in_annotation_list
 
@@ -290,10 +240,9 @@ if __name__ == '__main__':
     parser.add_argument('--num_threads', type=int, default=16, help='Number of threads for parallel processing, too large may result in errors')
     parser.add_argument('--overlap', type=int, default=0, help='Overlap pixels between adjacent patches')
     parser.add_argument('--patch_size', type=int, default=1120, help='Patch size')
-    # parser.add_argument('--multiscale', type=int, default=0, help='0 1')
     parser.add_argument('--scale', type=int, default=20, help='20x 10x 5x')
-    parser.add_argument('--dataset', type=str, default='/aaa/louisyuzhao/guy1/kaikasun/rowdata/project/huyanyuan/HIS-AI-part2', help='Dataset folder name')
-    parser.add_argument('--output', type=str, default='/aaa/louisyuzhao/guy1/kaikasun/DataSet/huyanyuan/output_patch/all_patch', help='Dataset folder name')
+    parser.add_argument('--dataset', type=str, default=None, help='Dataset folder name')
+    parser.add_argument('--output', type=str, default=None, help='Dataset folder name')
     parser.add_argument('--display', action="store_true", help='Display patch numbers under this setting')
     parser.add_argument('--annotation', action="store_true", help='Obtain patches in annotation region')
     args = parser.parse_args()
@@ -338,9 +287,9 @@ if __name__ == '__main__':
         for result in results:
             name, patch_list = result.get()
             dict_name2img[name] = patch_list
-        # for s in tqdm(all_slides):
-        #     name, patch_list = slide_to_patch_in_annotation(out_base, s, args.patch_size, step, args.scale)
-        #     dict_name2img[name] = patch_list
+        for s in tqdm(all_slides):
+            name, patch_list = slide_to_patch_in_annotation(out_base, s, args.patch_size, step, args.scale)
+            dict_name2img[name] = patch_list
         pickle.dump(dict_name2img, open(f"./dict_name2imgs.pkl", "wb"))
         print("saving at ./dict_name2imgs.pkl, move to your log_dir..")
     # crop all patches
@@ -356,4 +305,3 @@ if __name__ == '__main__':
 
         for thread in threads:
             thread.start()
-    #print("runner finished!")

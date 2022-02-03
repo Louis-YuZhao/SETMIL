@@ -1,11 +1,14 @@
-from util.gpu_gather import GpuGather
-from typing import Iterable
+
+import os
 import torch
 import util.misc as utils
 import util.custom_metrics as custom_metrics
 from sklearn import metrics
 import numpy as np
+import pandas as pd
 
+from util.gpu_gather import GpuGather
+from typing import Iterable
 from datasets.data_prefetcher import data_prefetcher
 
 
@@ -26,8 +29,6 @@ def train_one_epoch(logger, model: torch.nn.Module, criterion: torch.nn.Module,
     gpu_gather = GpuGather(is_distributed=is_distributed)
 
     prefetcher = data_prefetcher(data_loader, device, prefetch=True)
-    # samples, targets = prefetcher.next()
-
     bag_samples, targets = prefetcher.next()
 
     IMG_id = []
@@ -36,13 +37,10 @@ def train_one_epoch(logger, model: torch.nn.Module, criterion: torch.nn.Module,
 
         # with torch.autograd.detect_anomaly():
         outputs = model(bag_samples)
-
-
         try:
             label = torch.tensor([x['label'].cpu().numpy() for x in targets])
         except:
             label = torch.tensor([x['label'] for x in targets])
-
         # logger.info(torch.unique(label))
 
         assert not np.any(np.isnan(label.cpu().numpy())), f"Label is nan"
@@ -50,7 +48,7 @@ def train_one_epoch(logger, model: torch.nn.Module, criterion: torch.nn.Module,
         pid = torch.tensor([x['pid'] for x in targets])
         loss = criterion(outputs, label.cuda())
 
-        # added by zhenyulin for dsmil
+        # added for dsmil
         if isinstance(outputs, tuple):
             outputs = outputs[0]
 
@@ -63,12 +61,8 @@ def train_one_epoch(logger, model: torch.nn.Module, criterion: torch.nn.Module,
         loss_dict_reduced = utils.reduce_dict(loss_dict)
 
         loss_value = loss_dict_reduced['loss'].item()
-
-
         optimizer.zero_grad()
         loss.backward()
-
-
 
         if max_norm > 0:
             grad_total_norm = torch.nn.utils.clip_grad_norm_(model.parameters(), max_norm)
@@ -91,8 +85,6 @@ def train_one_epoch(logger, model: torch.nn.Module, criterion: torch.nn.Module,
     label = gpu_gather.label
     label = np.concatenate(label)
 
-
-
     # multi-label
     if len(label) > len(pred):
         label = label.reshape(len(pred), -1)
@@ -100,7 +92,6 @@ def train_one_epoch(logger, model: torch.nn.Module, criterion: torch.nn.Module,
         auc = []
         for i in range(num_of_class):
             pred_i = pred[:, i]
-            # pred_i = torch.nn.sigmoid(pred_i)
             labek_i = label[:, i]
             if np.sum(labek_i) > 0:
                 auc_i = metrics.roc_auc_score(labek_i, pred_i)
@@ -122,9 +113,6 @@ def train_one_epoch(logger, model: torch.nn.Module, criterion: torch.nn.Module,
         eval_result = {}
         eval_result['label'] = label
         eval_result['pred'] = pred
-
-        #modified by sunkai
-        #eval_result['pid'] = pid
         eval_result["img_id"] = IMG_id
 
         return stats, eval_result
@@ -138,7 +126,6 @@ def train_one_epoch(logger, model: torch.nn.Module, criterion: torch.nn.Module,
             auc = []
             for i in range(num_of_class):
                 pred_i = pred[:,i]
-                #pred_i = torch.nn.sigmoid(pred_i)
                 labek_i = np.eye(num_of_class)[label][:, i]
                 if np.sum(labek_i)>0:
                     auc_i = metrics.roc_auc_score(labek_i, pred_i)
@@ -244,9 +231,6 @@ def evaluate(logger, model, criterion, data_loader, device, output_dir, is_distr
 
     for samples, targets in metric_logger.log_every(data_loader, print_freq, header):
         samples = samples.to(device)
-        #modified by sunkai
-        #targets = [{k: v.to(device) for k, v in t.items()} for t in targets]
-
         try:
             label = torch.tensor([x['label'].cpu().numpy() for x in targets])
         except:
@@ -254,30 +238,21 @@ def evaluate(logger, model, criterion, data_loader, device, output_dir, is_distr
 
         pid = torch.tensor([x['pid'] for x in targets])
         IMG_id+=pid
-        #modified bu sunkai
-        #img_id = [x['img_id'] for x in targets]
-        #IMG_id+=img_id
-
         try:
             outputs = model(samples)
         except Exception as e:
             logger.info(samples['target'])
             raise e
-        # loss = criterion(outputs, targets)
-
         loss = criterion(outputs, label.cuda())
 
         loss_dict = {'loss': loss}
-        # weight_dict = criterion.weight_dict
-
         # reduce losses over all GPUs for logging purposes
         loss_dict_reduced = utils.reduce_dict(loss_dict)
 
         metric_logger.update(loss=loss_dict_reduced['loss'].item())
         # metric_logger.update(class_error=loss_dict_reduced['class_error'])
 
-
-        # added by zhenyulin for dsmil
+        # added for dsmil
         if isinstance(outputs, tuple):
             outputs = outputs[0]
 
@@ -286,12 +261,6 @@ def evaluate(logger, model, criterion, data_loader, device, output_dir, is_distr
         #gpu_gather.update(pred=torch.softmax(outputs.detach().cpu().view(b, -1), dim=1).numpy())
         gpu_gather.update(pred=outputs.detach().cpu().view(b, -1).numpy())
         gpu_gather.update(label=label.cpu().numpy().reshape(-1))
-
-        # modified by sunkai
-        #gpu_gather.update(pid=pid.cpu().numpy().tolist())
-        #gpu_gather.update(img_id=img_id.cpu().numpy().tolist())
-
-
 
     # gather the stats from all processes
     panoptic_res = None
@@ -303,22 +272,6 @@ def evaluate(logger, model, criterion, data_loader, device, output_dir, is_distr
 
     label = gpu_gather.label
     label = np.concatenate(label)
-
-    # modified by sunkai
-    # pid = gpu_gather.pid
-    # pid = np.array(pid)
-    # logger.info(f'number of example: {pid.shape}')
-
-
-
-
-    # logger.info(f'{pred.shape}, {label.shape}, ')
-    # keep only unique (and in sorted order) images
-    # merged_img_ids, idx = np.unique(pid, return_index=True)
-    # label = label[idx]
-    # pred = pred[idx]
-
-
     # multi-label
     if len(label) > len(pred):
         label = label.reshape(len(pred), -1)
@@ -347,9 +300,6 @@ def evaluate(logger, model, criterion, data_loader, device, output_dir, is_distr
         eval_result = {}
         eval_result['label'] = label
         eval_result['pred'] = pred
-        #eval_result['pid'] = pid
-
-        #modified by sunkai
         eval_result['imd_id'] = IMG_id
 
         return stats, eval_result
@@ -363,7 +313,6 @@ def evaluate(logger, model, criterion, data_loader, device, output_dir, is_distr
                 auc = []
                 for i in range(num_of_class):
                     pred_i = pred[:,i]
-                    #pred_i = torch.nn.sigmoid(pred_i)
                     labek_i = np.eye(num_of_class)[label][:, i]
                     if np.sum(labek_i)>0:
                         auc_i = metrics.roc_auc_score(labek_i, pred_i)
@@ -380,26 +329,16 @@ def evaluate(logger, model, criterion, data_loader, device, output_dir, is_distr
         logger.info(f"report: \n {cls_report}")
         logger.info(f"confusion matrix: \n {cfm}")
 
-        # if is_last_eval:
-        #     import pandas as pd
-        #     data = np.hstack([label.reshape(-1, 1), pred.reshape(-1, 2)])
-        #     df = pd.DataFrame(data, columns=['target', 'pred_0', 'pred_1'])
-        #     save_fp = os.path.join(save_path, 'pred.csv')
-        #     logger.info(f'Save result to {save_fp}')
-        #     df.to_csv(save_fp, index=False, encoding='utf_8_sig')
+        if is_last_eval:            
+            data = np.hstack([label.reshape(-1, 1), pred.reshape(-1, 2)])
+            df = pd.DataFrame(data, columns=['target', 'pred_0', 'pred_1'])
+            save_fp = os.path.join(save_path, 'pred.csv')
+            logger.info(f'Save result to {save_fp}')
+            df.to_csv(save_fp, index=False, encoding='utf_8_sig')
 
         pred_label = np.argmax(pred, axis=1)
         acc_score = metrics.accuracy_score(label, pred_label)
         if num_of_class == 2:
-            # precision, recall, thresholds = metrics.precision_recall_curve(label, pred[:, 1])
-            # f1_scores = 2 * recall * precision / (recall + precision)
-            # # if is_last_eval:
-            # #     for f, r, p in zip(f1_scores, recall, precision):
-            # #         logger.info(f'{f:.4f} {p: .4f} {r:.4f}')
-            # f1_scores[np.isnan(f1_scores)] = 0
-            # bst_idx = np.argmax(f1_scores)
-            # logger.info(
-            #     f'{display_header} Best F1: {f1_scores[bst_idx]:.4f} Precision: {precision[bst_idx]:.4f} Recall: {recall[bst_idx]:.4f}')
             f1_score = metrics.f1_score(label, pred_label)
             recall_score = metrics.recall_score(label, pred_label)
             precision_score = metrics.precision_score(label, pred_label)
@@ -414,11 +353,6 @@ def evaluate(logger, model, criterion, data_loader, device, output_dir, is_distr
             logger.info(f"ground truth: {label}, prediction: {pred_label}")
             kappa_res = custom_metrics.quadratic_kappa(label, pred_label, N=num_of_class)
             logger.info(f"quadratic kappa: \n {kappa_res}")
-        # for cls_idx in range(num_of_class):
-        #     current_prob = pred[:, cls_idx]
-        #     current_label = (label == cls_idx)
-        #     current_auc = metrics.roc_auc_score(current_label, current_prob)
-        #     logger.info(f'OVR AUC of Class {cls_idx} {current_auc:.5f}')
 
         metric_logger.synchronize_between_processes()
         #logger.info("Averaged stats:", metric_logger)
@@ -434,9 +368,6 @@ def evaluate(logger, model, criterion, data_loader, device, output_dir, is_distr
         eval_result = {}
         eval_result['label'] = label
         eval_result['pred'] = pred
-
-        # modified by sunkai
-        #eval_result['pid'] = pid
         eval_result['img_id'] = IMG_id
 
     else:
@@ -454,8 +385,5 @@ def evaluate(logger, model, criterion, data_loader, device, output_dir, is_distr
         eval_result = {}
         eval_result['label'] = label
         eval_result['pred'] = pred
-
-        #modified by sunkai
-        #eval_result['pid'] = pid
-        eval_result['imd_id'] = img_id
+        eval_result['imd_id'] = IMG_id
     return stats, eval_result
