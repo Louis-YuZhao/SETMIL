@@ -32,6 +32,7 @@ Code for paper titled "SETMIL: Spatial Encoding Transformer-based Multiple Insta
     six>=1.15.0
 # Pathological Image Analysis  #
 This code uses the centralized configs. Before using this code, a config file needs to be edited to assign necessary parameters. A sample config file named 'default.yaml' is provided as the reference.
+    
     ./trans/configs/default.yaml
 
 1、First, in order to split the WSI into patches, execute the following script.
