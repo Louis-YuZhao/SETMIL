@@ -1,6 +1,6 @@
 ## Spatial Encoding Transformer-based Multiple Instance Learning for Pathological Image Analysis ##
 
-Code for paper titled "SETMIL: Spatial Encoding Transformer-based Multiple Instance Learning for Pathological Image Analysis" submitted to CVPR2022. The basic method and applications are introduced as follows:
+Code for paper titled "SETMIL: Spatial Encoding Transformer-based Multiple Instance Learning for Pathological Image Analysis" submitted to MICCAI2022. The basic method and applications are introduced as follows:
 
 ![avatar](./Figure1.png)
 
